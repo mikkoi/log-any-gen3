@@ -7,6 +7,17 @@ package Log::Any::Gen3;
 # ABSTRACT: Bringing loggers and listeners together
 our $VERSION = '3.001';
 
+sub get_logger {
+    my ($class, %args) = @_;
+    my $proxy_class = delete $args{proxy_class} || 'Log::Any::Gen3::Proxy::Basic';
+    if (!$args{category}) {
+        $args{category} = caller;
+    }
+    (my $file = "$proxy_class.pm") =~ s{::}{/}g;
+    require $file;
+    return $proxy_class->new(%args);
+}
+
 =pod
 
 =encoding utf8

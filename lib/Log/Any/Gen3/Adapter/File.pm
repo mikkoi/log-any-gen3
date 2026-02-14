@@ -3,60 +3,60 @@ use strict;
 use warnings;
 
 # ABSTRACT: Adapter: File
+our $VERSION = '3.001';
+
+use Fcntl qw( :flock );
+use Carp qw( croak );
 
 use parent 'Log::Any::Gen3::Adapter';
 
-sub log {
-    my ($self, $lvl, $arg_1, $arg_2) = @_;
-    return if( $lvl < $self->level );
-    my $msg = $self->_format_message($arg_1, $arg_2);
-    print { $self->handle } $msg, "\n";
-}
-
-sub _build_handle {
-    my $self = shift;
-    my $file = $self->file;
-    open( my $fh, '>>', $file ) or die "Cannot open file '$file': $!";
-    return $fh;
-}
-
-sub _build_level {
-    return 'trace';
-}
-
-sub _build_file {
-    die "file attribute is required";
-}
-sub BUILDARGS {
-    my $class = shift;
-    my %args = @_;
-    if( exists $args{filename} ) {
-        $args{file} = delete $args{filename};
+sub _init {
+    my ($self, %args) = @_;
+    my $file = $args{file} // $args{filename};
+    $self->{file} = $file;
+    $self->{fh}   = $args{fh};  # optional pre-opened filehandle
+    if (!defined $self->{file} && !defined $self->{fh}) {
+        croak 'Either "file" or "fh" argument is required';
     }
-    return $class->SUPER::BUILDARGS(%args);
-}
-sub _build_formatter {
-    my $self = shift;
-    return $self->formatter_class->new(
-        prefix => $self->prefix,
-        suffix => $self->suffix,
-    );
-}
-sub _build_formatter_class {
-    return 'Log::Any::Gen3::Adapter::File::Formatter';
-}
-__PACKAGE__->mk_accessors(qw( handle file ));
-__PACKAGE__->mk_ro_accessors(qw( formatter formatter_class ));
-__PACKAGE__->mk_accessors(qw( level ));sub _build_prefix {
-    return '';
+    return;
 }
 
-sub _build_suffix {
-    return '';
+sub _fh {
+    my ($self) = @_;
+    if (!$self->{fh}) {
+        my $file = $self->{file};
+        open(my $fh, '>>', $file) or croak "Cannot open file '$file': $!";
+        $self->{fh} = $fh;
+    }
+    return $self->{fh};
 }
+
+sub file {
+    my ($self) = @_;
+    return $self->{file};
+}
+
+sub log {
+    my ($self, $level, $message, $context_href) = @_;
+    return if !$self->is_active($level);
+    my $formatted = $self->_format_message($level, $message, $context_href);
+    my $fh = $self->_fh();
+    flock($fh, LOCK_EX);
+    print {$fh} $formatted, "\n";
+    flock($fh, LOCK_UN);
+    return;
+}
+
 sub _format_message {
-    my ($self, $arg_1, $arg_2) = @_;
-    return $self->formatter->format($arg_1, $arg_2);
+    my ($self, $level, $message, $context_href) = @_;
+    my $msg = "[$level]";
+    $msg .= " $message" if defined $message && length $message;
+    if ($context_href && ref $context_href eq 'HASH' && %$context_href) {
+        my $ctx = join ', ', map { "$_=$context_href->{$_}" }
+            sort keys %$context_href;
+        $msg .= " {$ctx}";
+    }
+    return $msg;
 }
 
 1;
