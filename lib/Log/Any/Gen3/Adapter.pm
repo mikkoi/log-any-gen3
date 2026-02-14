@@ -4,9 +4,23 @@ use warnings;
 
 # ABSTRACT: Base class for all Adapter classes.
 
+use Carp qw( croak );
+
 sub log {
-    require Carp;
-    Carp::croak('Sub not implemented');
+    croak('Sub \'log()\' not implemented');
 }
 
+sub new {
+    my ($class, %args) = @_;
+    my $cat = $args{'categories'};
+    # TODO Validate category!
+    my %config = (
+    );
+    my $self = {
+        categories => [],
+        log_level => 
+        config => \%config,
+    };
+    return bless $self, $class;
+}
 1;

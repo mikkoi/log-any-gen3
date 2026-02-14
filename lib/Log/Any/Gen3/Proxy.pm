@@ -37,7 +37,7 @@ sub update_config {
 }
 
 foreach my $lvl ( Log::Any::Gen3::Level::levels ) {
-    no strict 'refs';
+    no strict 'refs'; ## no critic (TestingAndDebugging::ProhibitNoStrict)
     *$lvl = sub {
         # my ($self, @args) = @_;
         # $self->log( $lvl, @args );
